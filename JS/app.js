@@ -53,11 +53,14 @@ function colour(i, col) {
 
 function setcell(i, char) {cells[i].innerText = char}
 
-function ai() {let start = performance.now();
+function ai() {
+    //let start = performance.now();
+    //count = 0;
     b.move(minimax(b));
-    console.log(performance.now() - start);
-    b.show()
+    //console.log(performance.now() - start, count);
+    b.show();
 }
+function undo() {b.remove();b.show()}
 
 setup();
 b.show();

@@ -2,10 +2,8 @@ class Board {
     constructor (Pieces=null, white=true) {
         this.Pieces = (Pieces == null ? this.setupPieces() : Pieces);
         this.white = white;
-    }
-
-    clone() {
-        return new Board(this.Pieces.map(p => p.clone()), this.white);
+        this.history = [];
+        this.value = 0;
     }
 
     setupPieces() { 
@@ -13,8 +11,8 @@ class Board {
         Pieces.push(new   Rook( 0, false));
         Pieces.push(new Knight( 1, false));
         Pieces.push(new Bishop( 2, false));
-        Pieces.push(new   King( 3, false));
-        Pieces.push(new  Queen( 4, false));
+        Pieces.push(new   King( 4, false));
+        Pieces.push(new  Queen( 3, false));
         Pieces.push(new Bishop( 5, false));
         Pieces.push(new Knight( 6, false));
         Pieces.push(new   Rook( 7, false));
@@ -38,8 +36,8 @@ class Board {
         Pieces.push(new   Rook(56, true));
         Pieces.push(new Knight(57, true));
         Pieces.push(new Bishop(58, true));
-        Pieces.push(new   King(59, true));
-        Pieces.push(new  Queen(60, true));
+        Pieces.push(new   King(60, true));
+        Pieces.push(new  Queen(59, true));
         Pieces.push(new Bishop(61, true));
         Pieces.push(new Knight(62, true));
         Pieces.push(new   Rook(63, true));
@@ -47,12 +45,21 @@ class Board {
     }
 
     getPiece(i) {
+        let index = this.getIndex(i);
+        if (index < 0) {
+            return null;
+        } else {
+            return this.Pieces[index];
+        }
+    }
+
+    getIndex(i) {
         for (let index=0; index < this.Pieces.length; index++) {
             if (!this.Pieces[index].taken && this.Pieces[index].i == i) {
-                return this.Pieces[index];
+                return index;
             }
         }
-        return null;
+        return -1;
     }
 
     show() {
@@ -65,30 +72,44 @@ class Board {
             }
         }
     }
-
+    
     move(move) {
         let [from, to] = split(move);
-        let moving = this.getPiece(from);
-        let taking = this.getPiece(to);
-        if (taking != null) {
-            taking.taken = true;
+        let moving = this.getIndex(from);
+        let attacking = this.getIndex(to);
+        let firstMove = false;
+        let taking = false;
+        this.value -= this.Pieces[moving].score();
+        if (attacking != -1) {
+            this.Pieces[attacking].taken = true;
+            this.value -= this.Pieces[attacking].score();
+            taking = true;
+        } else {
+            attacking = 0;
         }
-        if (moving instanceof Pawn) {
-            moving.firstMove = false;
+        if (this.Pieces[moving] instanceof Pawn && this.Pieces[moving].firstMove) {
+            this.Pieces[moving].firstMove = false;
+            firstMove = true;
         }
-        moving.i = to;
+        this.Pieces[moving].i = to;
         this.white = !this.white;
+        this.value += this.Pieces[moving].score();
+        this.history.push(encode(firstMove, from, moving, taking, attacking));
     }
 
-    generateboards() {
-        let boards = [];
-        let moves = this.generateMoves();
-        for (var i = 0; i < moves.length; i++) {
-            let newboard = this.clone();
-            newboard.move(moves[i]);
-            boards.push(newboard);
+    remove() {
+        let [firstMove, from, moving, taking, attacking] = decode(this.history.pop());
+        this.value -= this.Pieces[moving].score();
+        if (taking) {
+            this.Pieces[attacking].taken = false;
+            this.value += this.Pieces[attacking].score();
         }
-        return boards;
+        if (firstMove && this.Pieces[moving] instanceof Pawn) {
+            this.Pieces[moving].firstMove = true;
+        }
+        this.Pieces[moving].i = from;
+        this.white = !this.white;
+        this.value += this.Pieces[moving].score();
     }
 
     generateMoves() {
@@ -100,6 +121,105 @@ class Board {
         }
         return moves;
     }
+    
+    Wordermoves(moves) {
+        let bestscore = [];
+        let tmp, tmpscore;
+        for (let i = 0; i < Math.min(6,moves.length); i++) {
+            this.move(moves[i]);
+            bestscore.push(this.value);
+            this.remove();
+            for (let j = i; j > 0; j--) {
+                if (bestscore[j] > bestscore[j-1]) {
+                    tmpscore = bestscore[j-1];
+                    bestscore[j-1] = bestscore[j];
+                    bestscore[j] = tmpscore;
+                    tmp = moves[j-1];
+                    moves[j-1] = moves[j];
+                    moves[j] = tmp;
+                } else {
+                    break;
+                }
+            }
+        }
+        for (let i = 6; i < moves.length; i++) {
+            this.move(moves[i]);
+            let score = this.value;
+            this.remove();
+            if (score > bestscore[5]) {
+                bestscore[5] = score;
+                tmp = moves[i];
+                moves[i] = moves[5];
+                moves[5] = tmp;
+                for (let j = 5; j > 0; j--) {
+                    if (bestscore[j] > bestscore[j-1]) {
+                        tmpscore = bestscore[j-1];
+                        bestscore[j-1] = bestscore[j];
+                        bestscore[j] = tmpscore;
+                        tmp = moves[j-1];
+                        moves[j-1] = moves[j];
+                        moves[j] = tmp;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+
+    Bordermoves(moves) {
+        let bestscore = [];
+        let tmp, tmpscore;
+        for (let i = 0; i < Math.min(6,moves.length); i++) {
+            this.move(moves[i]);
+            bestscore.push(this.value);
+            this.remove();
+            for (let j = i; j > 0; j--) {
+                if (bestscore[j] < bestscore[j-1]) {
+                    tmpscore = bestscore[j-1];
+                    bestscore[j-1] = bestscore[j];
+                    bestscore[j] = tmpscore;
+                    tmp = moves[j-1];
+                    moves[j-1] = moves[j];
+                    moves[j] = tmp;
+                } else {
+                    break;
+                }
+            }
+        }
+        for (let i = 6; i < moves.length; i++) {
+            this.move(moves[i]);
+            let score = this.value;
+            this.remove();
+            if (score < bestscore[5]) {
+                bestscore[5] = score;
+                tmp = moves[i];
+                moves[i] = moves[5];
+                moves[5] = tmp;
+                for (let j = 5; j > 0; j--) {
+                    if (bestscore[j] < bestscore[j-1]) {
+                        tmpscore = bestscore[j-1];
+                        bestscore[j-1] = bestscore[j];
+                        bestscore[j] = tmpscore;
+                        tmp = moves[j-1];
+                        moves[j-1] = moves[j];
+                        moves[j] = tmp;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+    
+    eval(move) {
+        this.move(move);
+        let score = this.value;
+        this.remove();
+        return score;
+    }
 
     gameover() {
         return this.generateMoves().length == 0;
@@ -109,9 +229,9 @@ class Board {
         let total = 0;
         for (let i = 0; i < this.Pieces.length; i++) {
             if (!this.Pieces[i].taken) {
-                total += this.Pieces[i].score;
+                total += this.Pieces[i].score();
             }
         }
-        return -total;
+        return total;
     }
 }

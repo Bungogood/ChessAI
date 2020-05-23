@@ -6,10 +6,15 @@ Bishop	♗ : ♝   30
 Knight	♘ : ♞   30
 Pawn	♙ : ♟   10
 */
+
 function move(from, to) {return (from << 6) | to}
 function split(move) {return [move >> 6, move & 63]}
 function xytoi(x, y) {return (y << 3) | x}
 function itoxy(i) {return [i & 7, i >> 3]}
+
+function t(n, s, num) {return (n >> s) & 2**(num)-1}
+function decode(n) {return [t(n,17,1),t(n,11,6),t(n,6,5),t(n,5,1),t(n,0,5)]}
+function encode(fm, f, m, t, a) {return (fm<<17) + (f<<11) + (m<<6) + (t<<5) + a}
 
 class Piece {
     constructor (i, white, taken) {
@@ -43,9 +48,18 @@ class Piece {
     validMove(x, y, moves) {
         if (this.withinBounds(x, y)) {
             let attacking = b.getPiece(xytoi(x, y));
-            if (attacking == null || (attacking != null && attacking.white != this.white)) {
+            if (attacking == null || attacking.white != this.white) {
                 moves.push(move(this.i, xytoi(x, y)));
             }
+        }
+    }
+
+    score() {
+        let [x, y] = itoxy(this.i);
+        if (this.white) {
+            return this.value + this.table[y][x];
+        } else {
+            return this.value - this.table[7-y][7-x];
         }
     }
 }
@@ -54,11 +68,17 @@ class King extends Piece {
     constructor (i, white, taken=false) {
         super(i, white, taken);
         this.char = white ? "♔" : "♚";
-        this.score = white ? 900 : -900;
-    }
-
-    clone() {
-        return new King(this.i, this.white, this.taken);
+        this.value = white ? 900 : -900;
+        this.table = [
+            [-3.0,-4.0,-4.0,-5.0,-5.0,-4.0,-4.0,-3.0],
+            [-3.0,-4.0,-4.0,-5.0,-5.0,-4.0,-4.0,-3.0],
+            [-3.0,-4.0,-4.0,-5.0,-5.0,-4.0,-4.0,-3.0],
+            [-3.0,-4.0,-4.0,-5.0,-5.0,-4.0,-4.0,-3.0],
+            [-2.0,-3.0,-3.0,-4.0,-4.0,-3.0,-3.0,-2.0],
+            [-1.0,-2.0,-2.0,-2.0,-2.0,-2.0,-2.0,-1.0],
+            [ 2.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0],
+            [ 2.0, 3.0, 1.0, 0.0, 0.0, 1.0, 3.0, 2.0]
+        ];
     }
     
     generateMoves(b) {
@@ -82,11 +102,17 @@ class Queen extends Piece {
     constructor (i, white, taken=false) {
         super(i, white, taken);
         this.char = white ? "♕" : "♛";
-        this.score = white ? 90 : -90;
-    }
-
-    clone() {
-        return new Queen(this.i, this.white, this.taken);
+        this.value = white ? 90 : -90;
+        this.table = [
+            [-2.0,-1.0,-1.0,-0.5,-0.5,-1.0,-1.0,-2.0],
+            [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,-1.0],
+            [-1.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.0,-1.0],
+            [-0.5, 0.0, 0.5, 0.5, 0.5, 0.5, 0.0,-0.5],
+            [ 0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.0,-0.5],
+            [-1.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.0,-1.0],
+            [-1.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0,-1.0],
+            [-2.0,-1.0,-1.0,-0.5,-0.5,-1.0,-1.0,-2.0]
+        ];
     }
     
     generateMoves(b) {
@@ -107,11 +133,17 @@ class Rook extends Piece {
     constructor (i, white, taken=false) {
         super(i, white, taken);
         this.char = white ? "♖" : "♜";
-        this.score = white ? 50 : -50;
-    }
-
-    clone() {
-        return new Rook(this.i, this.white, this.taken);
+        this.value = white ? 50 : -50;
+        this.table = [
+            [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [ 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5],
+            [-0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,-0.5],
+            [-0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,-0.5],
+            [-0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,-0.5],
+            [-0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,-0.5],
+            [-0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,-0.5],
+            [ 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0]
+        ];
     }
 
     generateMoves(b) {
@@ -128,11 +160,17 @@ class Bishop extends Piece {
     constructor (i, white, taken=false) {
         super(i, white, taken);
         this.char = white ? "♗" : "♝";
-        this.score = white ? 30 : -30;
-    }
-
-    clone() {
-        return new Bishop(this.i, this.white, this.taken);
+        this.value = white ? 30 : -30;
+        this.table = [
+            [-2.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-2.0],
+            [-1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0,-1.0],
+            [-1.0, 0.0, 0.5, 1.0, 1.0, 0.5, 0.0,-1.0],
+            [-1.0, 0.5, 0.5, 1.0, 1.0, 0.5, 0.5,-1.0],
+            [-1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0,-1.0],
+            [-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,-1.0],
+            [-1.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5,-1.0],
+            [-2.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-2.0]
+        ];
     }
 
     generateMoves(b) {
@@ -149,11 +187,17 @@ class Knight extends Piece {
     constructor (i, white, taken=false) {
         super(i, white, taken);
         this.char = white ? "♘" : "♞";
-        this.score = white ? 30 : -30;
-    }
-
-    clone() {
-        return new Knight(this.i, this.white, this.taken);
+        this.value = white ? 30 : -30;
+        this.table = [
+            [-5.0,-4.0,-3.0,-3.0,-3.0,-3.0,-4.0,-5.0],
+            [-4.0,-2.0, 0.0, 0.0, 0.0, 0.0,-2.0,-4.0],
+            [-3.0, 0.0, 1.0, 1.5, 1.5, 1.0, 0.0,-3.0],
+            [-3.0, 0.5, 1.5, 2.0, 2.0, 1.5, 0.5,-3.0],
+            [-3.0, 0.0, 1.5, 2.0, 2.0, 1.5, 0.0,-3.0],
+            [-3.0, 0.5, 1.0, 1.5, 1.5, 1.0, 0.5,-3.0],
+            [-4.0,-2.0, 0.0, 0.5, 0.5, 0.0,-2.0,-4.0],
+            [-5.0,-4.0,-3.0,-3.0,-3.0,-3.0,-4.0,-5.0]
+        ];
     }
     
     generateMoves(b) {
@@ -176,27 +220,33 @@ class Pawn extends Piece {
         super(i, white, taken);
         this.firstMove = firstMove;
         this.char = white ? "♙" : "♟";
-        this.score = white ? 10 : -10;
-    }
-
-    clone() {
-        return new Pawn(this.i, this.white, this.taken, this.firstMove);
+        this.value = white ? 10 : -10;
+        this.table = [
+            [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [ 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0],
+            [ 1.0, 1.0, 2.0, 3.0, 3.0, 2.0, 1.0, 1.0],
+            [ 0.5, 0.5, 1.0, 2.5, 2.5, 1.0, 0.5, 0.5],
+            [ 0.0, 0.0, 0.0, 2.0, 2.0, 0.0, 0.0, 0.0],
+            [ 0.5,-0.5,-1.0, 0.0, 0.0,-1.0,-0.5, 0.5],
+            [ 0.5, 1.0, 1.0,-2.0,-2.0, 1.0, 1.0, 0.5],
+            [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        ];
     }
     
     generateMoves(b) {
         let moves = [];
         let [x, y] = itoxy(this.i);
         let dy = this.white ? -1 : 1;
-        if (this.firstMove) {
-            let attacking = b.getPiece(xytoi(x, y+2*dy));
-            if (attacking == null) {
-                moves.push(move(this.i, xytoi(x, y+2*dy)));
-            }
-        }
         if (this.withinBounds(x, y+dy)) {
             let attacking = b.getPiece(xytoi(x, y+dy));
             if (attacking == null) {
                 moves.push(move(this.i, xytoi(x, y+dy)));
+                if (this.firstMove) {
+                    attacking = b.getPiece(xytoi(x, y+2*dy));
+                    if (attacking == null) {
+                        moves.push(move(this.i, xytoi(x, y+2*dy)));
+                    }
+                }
             }
         }
         if (this.withinBounds(x+1, y+dy)) {
